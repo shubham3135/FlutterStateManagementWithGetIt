@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
+
+import 'app_module.dart';
+
+GetIt getIt = GetIt.instance;
 
 void main() {
+  getIt.registerSingleton<AppModel>(AppModelImplementation(),
+      signalsReady: true);
   runApp(MyApp());
 }
 
@@ -19,48 +26,81 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+  MyHomePage({Key? key, this.title}) : super(key: key);
 
-  final String title;
+  final String? title;
 
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  @override
+  void initState() {
+    // Access the instance of the registered AppModel
+    // As we don't know for sure if AppModel is already ready we use getAsync
+    getIt
+        .isReady<AppModel>()
+        .then((_) => getIt<AppModel>().addListener(update));
+    // Alternative
+    // getIt.get<AppModel>().addListener(update);
 
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+    super.initState();
   }
 
   @override
+  void dispose() {
+    getIt<AppModel>().removeListener(update);
+    super.dispose();
+  }
+
+  void update() => setState(() => {});
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+    return Material(
+      child: FutureBuilder(
+          future: getIt.allReady(),
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: Text(widget.title!),
+                ),
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Text(
+                        'You have pushed the button this many times:',
+                      ),
+                      Text(
+                        getIt<AppModel>().counter.toString(),
+                        style: Theme.of(context).textTheme.headline4,
+                      ),
+                    ],
+                  ),
+                ),
+                floatingActionButton: FloatingActionButton(
+                  onPressed: getIt<AppModel>().incrementCounter,
+                  tooltip: 'Increment',
+                  child: Icon(Icons.add),
+                ),
+              );
+            } else {
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Waiting for initialisation'),
+                  SizedBox(
+                    height: 16,
+                  ),
+                  CircularProgressIndicator(),
+                ],
+              );
+            }
+          }),
     );
   }
 }
